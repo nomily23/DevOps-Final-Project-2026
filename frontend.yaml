@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: frontend
+          image: 299332719643.dkr.ecr.eu-north-1.amazonaws.com/devops-task-frontend:latest
+          ports:
+            - containerPort: 3000
+          env:
+            # כאן אנחנו אומרים לפרונטאנד לאן לפנות (השם של ה-Service של הבקאנד בקוברנטיס)
+            - name: BACKEND_URL
+              value: "http://backend-service:3001" 
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-service
+spec:
+  selector:
+    app: frontend
+  ports:
+    - port: 80
+      targetPort: 3000
