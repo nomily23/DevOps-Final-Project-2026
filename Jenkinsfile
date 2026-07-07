@@ -8,16 +8,20 @@ pipeline {
         AWS_SECRET_ACCESS_KEY = credentials('aws-secret-key')
     }
 
-    stages {
-        stage('Build & Push Backend') {
-            steps {
-                // במקום לכתוב נתיב, אנחנו משתמשים בפקודה ישירות
-                // אם זה לא יעבוד, הבעיה היא שהדוקר לא מותקן בתוך הקונטיינר
-                sh 'docker build -t ${ECR_REGISTRY}/devops-task-backend:${BUILD_NUMBER} ./backend'
-                sh 'aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}'
-                sh 'docker push ${ECR_REGISTRY}/devops-task-backend:${BUILD_NUMBER}'
-            }
+    stage('Build & Push Backend') {
+    steps {
+        script {
+            // 1. התחברות ל-AWS ECR בצורה מפורשת עם המפתחות שהגדרנו
+            sh "aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}"
+            
+            // 2. בניית האימג'
+            sh "docker build -t ${ECR_REGISTRY}/devops-task-backend:${BUILD_NUMBER} ./backend"
+            
+            // 3. שליחה ל-ECR
+            sh "docker push ${ECR_REGISTRY}/devops-task-backend:${BUILD_NUMBER}"
         }
+    }
+}
         
         stage('Deploy to EKS') {
             steps {
