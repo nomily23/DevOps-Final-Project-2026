@@ -1,47 +1,29 @@
 pipeline {
     agent any
-    
     environment {
         AWS_DEFAULT_REGION = 'us-east-1'
         ECR_URL = '299332719643.dkr.ecr.us-east-1.amazonaws.com'
     }
-
     stages {
         stage('Build & Push') {
             steps {
-                withCredentials([string(credentialsId: 'aws-access-key', variable: 'AWS_ACCESS_KEY_ID'),
-                                 string(credentialsId: 'aws-secret-key', variable: 'AWS_SECRET_ACCESS_KEY')]) {
+                withCredentials([string(credentialsId: 'aws-access-key', variable: 'KEY'),
+                                 string(credentialsId: 'aws-secret-key', variable: 'SECRET')]) {
                     script {
-                        // 1. הגדרת משתני סביבה בצורה ידנית בתוך ה-Shell (הכי בטוח בג'נקינס)
-                        sh """
-                        export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-                        export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-                        export AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}
+                        // שלב 1: אימות בלבד (בלי להתחבר ל-docker עדיין)
+                        sh "aws --version"
+                        sh "export AWS_ACCESS_KEY_ID=$KEY && export AWS_SECRET_ACCESS_KEY=$SECRET && aws sts get-caller-identity"
                         
-                        # לוגין ישיר ל-Docker ללא pipe שיכול להיתקע
-                        PASSWORD=\$(aws ecr get-login-password --region ${AWS_DEFAULT_REGION})
-                        echo \$PASSWORD | docker login --username AWS --password-stdin ${ECR_URL}
+                        // שלב 2: יצירת סיסמה לקובץ זמני
+                        sh "export AWS_ACCESS_KEY_ID=$KEY && export AWS_SECRET_ACCESS_KEY=$SECRET && aws ecr get-login-password --region ${AWS_DEFAULT_REGION} > ecr_password.txt"
                         
-                        # בנייה ושליחה
-                        docker build -t ${ECR_URL}/devops-task-backend:${BUILD_NUMBER} ./backend
-                        docker push ${ECR_URL}/devops-task-backend:${BUILD_NUMBER}
-                        """
+                        // שלב 3: התחברות ל-Docker בעזרת הקובץ
+                        sh "cat ecr_password.txt | docker login --username AWS --password-stdin ${ECR_URL}"
+                        
+                        // שלב 4: בניה ודחיפה
+                        sh "docker build -t ${ECR_URL}/devops-task-backend:${BUILD_NUMBER} ./backend"
+                        sh "docker push ${ECR_URL}/devops-task-backend:${BUILD_NUMBER}"
                     }
-                }
-            }
-        }
-        
-        stage('Deploy') {
-            steps {
-                withCredentials([string(credentialsId: 'aws-access-key', variable: 'AWS_ACCESS_KEY_ID'),
-                                 string(credentialsId: 'aws-secret-key', variable: 'AWS_SECRET_ACCESS_KEY')]) {
-                    sh """
-                    export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-                    export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-                    export AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}
-                    
-                    kubectl set image deployment/backend backend=${ECR_URL}/devops-task-backend:${BUILD_NUMBER}
-                    """
                 }
             }
         }
