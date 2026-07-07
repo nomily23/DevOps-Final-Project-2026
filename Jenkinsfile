@@ -7,7 +7,6 @@ pipeline {
     stages {
         stage('Build') {
             steps {
-                // בנייה מקומית – לא דורשת לוגין, לכן לא יכולה להיתקע!
                 sh "docker build -t devops-task-backend:${BUILD_NUMBER} ./backend"
             }
         }
@@ -16,10 +15,18 @@ pipeline {
                 withCredentials([string(credentialsId: 'aws-access-key', variable: 'KEY'),
                                  string(credentialsId: 'aws-secret-key', variable: 'SECRET')]) {
                     script {
-                        // תיוג והעלאה - עושים את הלוגין בשורה אחת פשוטה בלי פיצולים
+                        // 1. תיוג
                         sh "docker tag devops-task-backend:${BUILD_NUMBER} ${ECR_URL}/devops-task-backend:${BUILD_NUMBER}"
-                        sh "aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${ECR_URL}"
-                        sh "docker push ${ECR_URL}/devops-task-backend:${BUILD_NUMBER}"
+                        
+                        // 2. פתרון ה-Push הישיר (בלי docker login!)
+                        // אנחנו מגדירים את ה-Credentials בתוך ה-shell ומריצים את הדחיפה
+                        sh """
+                        export AWS_ACCESS_KEY_ID=$KEY
+                        export AWS_SECRET_ACCESS_KEY=$SECRET
+                        # אנחנו משתמשים בפקודה של AWS ECR שמתחברת אוטומטית ללא צורך ב-login נפרד
+                        aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${ECR_URL}
+                        docker push ${ECR_URL}/devops-task-backend:${BUILD_NUMBER}
+                        """
                     }
                 }
             }
