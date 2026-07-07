@@ -12,22 +12,26 @@ pipeline {
                 withCredentials([string(credentialsId: 'aws-access-key', variable: 'AWS_ACCESS_KEY_ID'),
                                  string(credentialsId: 'aws-secret-key', variable: 'AWS_SECRET_ACCESS_KEY')]) {
                     
-                    // שלב 1: הגדרת ה-AWS
-                    sh 'aws configure set aws_access_key_id $AWS_ACCESS_KEY_ID'
-                    sh 'aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY'
-                    sh 'aws configure set default.region $AWS_DEFAULT_REGION'
-                    
-                    // שלב 2: לוגין ודחיפה - ללא השתמשות ב-script
-                    sh "aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${ECR_URL}"
-                    sh "docker build -t ${ECR_URL}/devops-task-backend:${BUILD_NUMBER} ./backend"
-                    sh "docker push ${ECR_URL}/devops-task-backend:${BUILD_NUMBER}"
+                    // אנחנו לא משתמשים ב-aws configure. 
+                    // ה-AWS CLI יודע לקרוא אוטומטית את המשתנים AWS_ACCESS_KEY_ID ו-AWS_SECRET_ACCESS_KEY
+                    // פשוט נגדיר אותם כאן ב-Pipeline כמשתנים זמניים
+                    withEnv(["AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}", "AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}"]) {
+                        sh "aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${ECR_URL}"
+                        sh "docker build -t ${ECR_URL}/devops-task-backend:${BUILD_NUMBER} ./backend"
+                        sh "docker push ${ECR_URL}/devops-task-backend:${BUILD_NUMBER}"
+                    }
                 }
             }
         }
         
         stage('Deploy') {
             steps {
-                sh "kubectl set image deployment/backend backend=${ECR_URL}/devops-task-backend:${BUILD_NUMBER}"
+                withCredentials([string(credentialsId: 'aws-access-key', variable: 'AWS_ACCESS_KEY_ID'),
+                                 string(credentialsId: 'aws-secret-key', variable: 'AWS_SECRET_ACCESS_KEY')]) {
+                    withEnv(["AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}", "AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}"]) {
+                        sh "kubectl set image deployment/backend backend=${ECR_URL}/devops-task-backend:${BUILD_NUMBER}"
+                    }
+                }
             }
         }
     }
