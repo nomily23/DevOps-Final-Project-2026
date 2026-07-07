@@ -2,9 +2,8 @@ pipeline {
     agent any 
     
     environment {
-        AWS_REGION = 'eu-north-1'
-        ECR_REGISTRY = '299332719643.dkr.ecr.eu-north-1.amazonaws.com'
-        // שימוש ב-Credentials שהגדרנו כ-Secret Text
+        AWS_REGION = 'us-east-1' // כאן עשינו את השינוי
+        ECR_REGISTRY = '299332719643.dkr.ecr.us-east-1.amazonaws.com' // וגם כאן, כדי שזה יתאים
         AWS_ACCESS_KEY_ID = credentials('aws-access-key')
         AWS_SECRET_ACCESS_KEY = credentials('aws-secret-key')
     }
