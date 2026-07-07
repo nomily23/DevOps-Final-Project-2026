@@ -6,22 +6,14 @@ pipeline {
         ECR_REGISTRY = '299332719643.dkr.ecr.eu-north-1.amazonaws.com'
     }
     
+    pipeline {
+    agent any 
     stages {
-        stage('Build & Push Backend') {
+        stage('Test') {
             steps {
-                script {
-                    // כאן אנחנו מניחים שהתקנו את הכלים בקונטיינר כפי שעשינו ב-bash
-                    sh "docker build -t ${ECR_REGISTRY}/devops-task-backend:${BUILD_NUMBER} ./backend"
-                    sh "aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}"
-                    sh "docker push ${ECR_REGISTRY}/devops-task-backend:${BUILD_NUMBER}"
-                }
-            }
-        }
-        stage('Deploy to EKS') {
-            steps {
-                // עדכון ה-Deployment ב-EKS
-                sh "kubectl set image deployment/backend backend=${ECR_REGISTRY}/devops-task-backend:${BUILD_NUMBER}"
+                sh 'echo "Hello, pipeline is working!"'
             }
         }
     }
+}
 }
