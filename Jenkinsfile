@@ -1,27 +1,34 @@
 pipeline {
-    agent any 
+    agent any
     
     environment {
-        AWS_REGION = 'us-east-1'
-        ECR_REGISTRY = '299332719643.dkr.ecr.us-east-1.amazonaws.com'
-        // נשתמש בשמות הקבועים שיצרנו ב-Credentials
-        AWS_ACCESS_KEY_ID = credentials('aws-access-key')
-        AWS_SECRET_ACCESS_KEY = credentials('aws-secret-key')
+        // כאן אנחנו מגדירים את הכל בצורה הכי פשוטה
+        AWS_DEFAULT_REGION = 'us-east-1'
+        ECR_URL = '299332719643.dkr.ecr.us-east-1.amazonaws.com'
     }
 
     stages {
-        stage('Build & Push Backend') {
+        stage('Build & Push') {
             steps {
-                // הרצה ישירה בלי סקריפטים מורכבים שעוברים ב-Sandbox
-                sh 'aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}'
-                sh '/usr/bin/docker build -t ${ECR_REGISTRY}/devops-task-backend:${BUILD_NUMBER} ./backend'
-                sh '/usr/bin/docker push ${ECR_REGISTRY}/devops-task-backend:${BUILD_NUMBER}'
+                // נשתמש ב-withCredentials כדי להזריק את המפתחות בביטחון
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-secret-key']]) {
+                    script {
+                        // 1. התחברות ל-AWS ECR
+                        sh "aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${ECR_URL}"
+                        
+                        // 2. בניית האימג' ושליחה
+                        sh "docker build -t ${ECR_URL}/devops-task-backend:${BUILD_NUMBER} ./backend"
+                        sh "docker push ${ECR_URL}/devops-task-backend:${BUILD_NUMBER}"
+                    }
+                }
             }
         }
         
-        stage('Deploy to EKS') {
+        stage('Deploy') {
             steps {
-                sh 'kubectl set image deployment/backend backend=${ECR_REGISTRY}/devops-task-backend:${BUILD_NUMBER}'
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-secret-key']]) {
+                    sh "kubectl set image deployment/backend backend=${ECR_URL}/devops-task-backend:${BUILD_NUMBER}"
+                }
             }
         }
     }
