@@ -11,16 +11,17 @@ pipeline {
     stages {
         stage('Build & Push Backend') {
             steps {
-                // אנחנו משתמשים בנתיב המלא כדי לוודא שג'נקינס מוצא אותו
-                sh "/usr/bin/docker build -t ${ECR_REGISTRY}/devops-task-backend:${BUILD_NUMBER} ./backend"
-                sh "aws ecr get-login-password --region ${AWS_REGION} | /usr/bin/docker login --username AWS --password-stdin ${ECR_REGISTRY}"
-                sh "/usr/bin/docker push ${ECR_REGISTRY}/devops-task-backend:${BUILD_NUMBER}"
+                // במקום לכתוב נתיב, אנחנו משתמשים בפקודה ישירות
+                // אם זה לא יעבוד, הבעיה היא שהדוקר לא מותקן בתוך הקונטיינר
+                sh 'docker build -t ${ECR_REGISTRY}/devops-task-backend:${BUILD_NUMBER} ./backend'
+                sh 'aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}'
+                sh 'docker push ${ECR_REGISTRY}/devops-task-backend:${BUILD_NUMBER}'
             }
         }
         
         stage('Deploy to EKS') {
             steps {
-                sh "kubectl set image deployment/backend backend=${ECR_REGISTRY}/devops-task-backend:${BUILD_NUMBER}"
+                sh 'kubectl set image deployment/backend backend=${ECR_REGISTRY}/devops-task-backend:${BUILD_NUMBER}'
             }
         }
     }
