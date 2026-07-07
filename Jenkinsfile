@@ -1,14 +1,10 @@
 pipeline {
-    agent {
-        docker {
-            image 'amazon/aws-cli'
-            args '-u root --entrypoint=""'
-        }
-    }
+    agent any 
     
     environment {
         AWS_REGION = 'eu-north-1'
         ECR_REGISTRY = '299332719643.dkr.ecr.eu-north-1.amazonaws.com'
+        // שימוש ב-Credentials שהגדרנו כ-Secret Text
         AWS_ACCESS_KEY_ID = credentials('aws-access-key')
         AWS_SECRET_ACCESS_KEY = credentials('aws-secret-key')
     }
@@ -17,21 +13,20 @@ pipeline {
         stage('Build & Push Backend') {
             steps {
                 script {
-                    // 1. התחברות ל-AWS ECR
+                    // 1. התחברות ל-ECR (נשתמש בנתיב מלא אם צריך, אבל בד"כ 'aws' עובד)
                     sh "aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}"
                     
-                    // 2. בניית האימג'
-                    sh "docker build -t ${ECR_REGISTRY}/devops-task-backend:${BUILD_NUMBER} ./backend"
+                    // 2. בנייה - הוספתי נתיב מלא למקרה שזה לא מוצא
+                    sh "/usr/bin/docker build -t ${ECR_REGISTRY}/devops-task-backend:${BUILD_NUMBER} ./backend"
                     
-                    // 3. שליחה ל-ECR
-                    sh "docker push ${ECR_REGISTRY}/devops-task-backend:${BUILD_NUMBER}"
+                    // 3. שליחה
+                    sh "/usr/bin/docker push ${ECR_REGISTRY}/devops-task-backend:${BUILD_NUMBER}"
                 }
             }
         }
         
         stage('Deploy to EKS') {
             steps {
-                // עדכון ה-Deployment ב-EKS
                 sh "kubectl set image deployment/backend backend=${ECR_REGISTRY}/devops-task-backend:${BUILD_NUMBER}"
             }
         }
