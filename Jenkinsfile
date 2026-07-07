@@ -5,26 +5,23 @@ pipeline {
         ECR_URL = '299332719643.dkr.ecr.us-east-1.amazonaws.com'
     }
     stages {
-        stage('Build') {
-            steps {
-                sh "docker build -t devops-task-backend:${BUILD_NUMBER} ./backend"
-            }
-        }
-        stage('Push') {
+        stage('Build & Push') {
             steps {
                 withCredentials([string(credentialsId: 'aws-access-key', variable: 'KEY'),
                                  string(credentialsId: 'aws-secret-key', variable: 'SECRET')]) {
                     script {
-                        // 1. תיוג
-                        sh "docker tag devops-task-backend:${BUILD_NUMBER} ${ECR_URL}/devops-task-backend:${BUILD_NUMBER}"
-                        
-                        // 2. פתרון ה-Push הישיר (בלי docker login!)
-                        // אנחנו מגדירים את ה-Credentials בתוך ה-shell ומריצים את הדחיפה
+                        // אנחנו משתמשים במשתני סביבה ישירות בתוך הפקודה
+                        // ומריצים את הלוגין בדרך הכי בטוחה שיש
                         sh """
                         export AWS_ACCESS_KEY_ID=$KEY
                         export AWS_SECRET_ACCESS_KEY=$SECRET
-                        # אנחנו משתמשים בפקודה של AWS ECR שמתחברת אוטומטית ללא צורך ב-login נפרד
-                        aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${ECR_URL}
+                        export AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}
+                        
+                        # לוגין ישיר ללא pipe
+                        aws ecr get-login-password --region ${AWS_DEFAULT_REGION} > password.txt
+                        cat password.txt | docker login --username AWS --password-stdin ${ECR_URL}
+                        
+                        docker build -t ${ECR_URL}/devops-task-backend:${BUILD_NUMBER} ./backend
                         docker push ${ECR_URL}/devops-task-backend:${BUILD_NUMBER}
                         """
                     }
