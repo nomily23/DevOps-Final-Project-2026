@@ -11,18 +11,21 @@ pipeline {
             steps {
                 withCredentials([string(credentialsId: 'aws-access-key', variable: 'AWS_ACCESS_KEY_ID'),
                                  string(credentialsId: 'aws-secret-key', variable: 'AWS_SECRET_ACCESS_KEY')]) {
-                    
                     script {
-                        // הזרקת המפתחות כמשתני סביבה זמניים לפקודת ה-aws cli
-                        withEnv(["AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}", "AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}"]) {
-                            
-                            // התחברות ל-ECR ישירות
-                            sh "aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${ECR_URL}"
-                            
-                            // בנייה ושליחה
-                            sh "docker build -t ${ECR_URL}/devops-task-backend:${BUILD_NUMBER} ./backend"
-                            sh "docker push ${ECR_URL}/devops-task-backend:${BUILD_NUMBER}"
-                        }
+                        // 1. הגדרת משתני סביבה בצורה ידנית בתוך ה-Shell (הכי בטוח בג'נקינס)
+                        sh """
+                        export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+                        export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+                        export AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}
+                        
+                        # לוגין ישיר ל-Docker ללא pipe שיכול להיתקע
+                        PASSWORD=\$(aws ecr get-login-password --region ${AWS_DEFAULT_REGION})
+                        echo \$PASSWORD | docker login --username AWS --password-stdin ${ECR_URL}
+                        
+                        # בנייה ושליחה
+                        docker build -t ${ECR_URL}/devops-task-backend:${BUILD_NUMBER} ./backend
+                        docker push ${ECR_URL}/devops-task-backend:${BUILD_NUMBER}
+                        """
                     }
                 }
             }
@@ -32,9 +35,13 @@ pipeline {
             steps {
                 withCredentials([string(credentialsId: 'aws-access-key', variable: 'AWS_ACCESS_KEY_ID'),
                                  string(credentialsId: 'aws-secret-key', variable: 'AWS_SECRET_ACCESS_KEY')]) {
-                    withEnv(["AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}", "AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}"]) {
-                        sh "kubectl set image deployment/backend backend=${ECR_URL}/devops-task-backend:${BUILD_NUMBER}"
-                    }
+                    sh """
+                    export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+                    export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+                    export AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}
+                    
+                    kubectl set image deployment/backend backend=${ECR_URL}/devops-task-backend:${BUILD_NUMBER}
+                    """
                 }
             }
         }
