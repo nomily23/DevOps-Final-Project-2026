@@ -13,24 +13,26 @@ pipeline {
         AWS_SECRET_ACCESS_KEY = credentials('aws-secret-key')
     }
 
-    stage('Build & Push Backend') {
-    steps {
-        script {
-            // 1. התחברות ל-AWS ECR בצורה מפורשת עם המפתחות שהגדרנו
-            sh "aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}"
-            
-            // 2. בניית האימג'
-            sh "docker build -t ${ECR_REGISTRY}/devops-task-backend:${BUILD_NUMBER} ./backend"
-            
-            // 3. שליחה ל-ECR
-            sh "docker push ${ECR_REGISTRY}/devops-task-backend:${BUILD_NUMBER}"
+    stages {
+        stage('Build & Push Backend') {
+            steps {
+                script {
+                    // 1. התחברות ל-AWS ECR
+                    sh "aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}"
+                    
+                    // 2. בניית האימג'
+                    sh "docker build -t ${ECR_REGISTRY}/devops-task-backend:${BUILD_NUMBER} ./backend"
+                    
+                    // 3. שליחה ל-ECR
+                    sh "docker push ${ECR_REGISTRY}/devops-task-backend:${BUILD_NUMBER}"
+                }
+            }
         }
-    }
-}
         
         stage('Deploy to EKS') {
             steps {
-                sh 'kubectl set image deployment/backend backend=${ECR_REGISTRY}/devops-task-backend:${BUILD_NUMBER}'
+                // עדכון ה-Deployment ב-EKS
+                sh "kubectl set image deployment/backend backend=${ECR_REGISTRY}/devops-task-backend:${BUILD_NUMBER}"
             }
         }
     }
